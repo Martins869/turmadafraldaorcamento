@@ -299,47 +299,88 @@
 
     <script>
         // --- BANCO DE DADOS DE PREÇOS (Simulando Airtable) ---
-        const priceTable = {
-            "Baixada Santista": {
-                "Cuidar e Brincar": {
-                    "Mensal fixo": { base: 30.50, night: 10.50, sunday: 30.50, child: 10.50 },
-                    "Esporádico": { base: 37.50, night: 9.37, sunday: 37.50, child: 10.50 }
-                },
-                "Cuidar e Educar": {
-                    "Mensal fixo": { base: 40.00, night: 10.00, sunday: 40.00, child: 10.50 },
-                    "Esporádico": { base: 52.50, night: 13.13, sunday: 52.50, child: 10.50 }
-                },
-                "Cuidar e Acolher": {
-                    "Mensal fixo": { base: 40.00, night: 10.00, sunday: 40.00, child: 10.50 },
-                    "Esporádico": { base: 52.50, night: 13.13, sunday: 52.50, child: 10.50 }
-                }
-            },
-            "São Paulo": {
-                "Cuidar e Brincar": {
-                    "Mensal fixo": { base: 40.00, night: 10.50, sunday: 40.00, child: 10.50 },
-                    "Esporádico": { base: 50.00, night: 10.50, sunday: 50.00, child: 10.50 }
-                },
-                "Cuidar e Educar": {
-                    "Mensal fixo": { base: 42.00, night: 10.50, sunday: 42.00, child: 10.50 },
-                    "Esporádico": { base: 60.00, night: 10.50, sunday: 60.00, child: 10.50 }
-                },
-                "Cuidar e Acolher": {
-                    "Mensal fixo": { base: 42.00, night: 10.50, sunday: 42.00, child: 10.50 },
-                    "Esporádico": { base: 60.00, night: 10.50, sunday: 60.00, child: 10.50 }
-                }
+        let priceTable = {}; // Inicia a tabela de preços vazia
+
+async function fetchPriceTable() {
+    // SUBSTITUA PELAS SUAS CHAVES DO AIRTABLE
+    const AIRTABLE_BASE_ID = 'app5u73geOfUbS3Vm';
+    const AIRTABLE_PERSONAL_ACCESS_TOKEN = 'patSHzhaIu1vTmKBe.137e2124394416a20e84d4e160319b8e711efc352dd364413414d18b6c456692';
+    
+    // O nome da sua tabela no Airtable. Se tiver espaços, mantenha como está.
+    const AIRTABLE_TABLE_NAME = 'Tabela de Preços'; 
+
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}`
             }
-        };
+        });
+
+        if (!response.ok) {
+            throw new Error('Erro ao buscar dados do Airtable. Verifique o ID da Base e o Token.');
+        }
+
+        const data = await response.json();
+        priceTable = formatAirtableData(data.records);
+        console.log('Tabela de preços carregada do Airtable com sucesso!');
+        
+        // Habilita o botão de calcular após carregar os preços
+        const calculateBtn = document.getElementById('calculate-btn');
+        calculateBtn.disabled = false;
+        calculateBtn.textContent = 'Calcular Orçamento';
+
+    } catch (error) {
+        console.error(error);
+        alert('Não foi possível carregar a tabela de preços. Verifique a configuração e a conexão com a internet.');
+    }
+}
+
+function formatAirtableData(records) {
+    const formattedTable = {};
+    records.forEach(record => {
+        const fields = record.fields;
+        const region = fields['Região'];
+        const service = fields['Tipo de Serviço'];
+        const plan = fields['Plano'];
+
+        // Garante que os nomes dos campos correspondem exatamente aos da sua tabela
+        if (region && service && plan) {
+            if (!formattedTable[region]) {
+                formattedTable[region] = {};
+            }
+            if (!formattedTable[region][service]) {
+                formattedTable[region][service] = {};
+            }
+
+            formattedTable[region][service][plan] = {
+                base: fields['Preço por Hora (R$)'] || 0,
+                night: fields['Adicional Noturno (R$)'] || 0,
+                sunday: fields['Adicional Dom/Feriado (R$)'] || 0,
+                child: fields['Adicional Criança Extra (R$)'] || 0
+            };
+        }
+    });
+    return formattedTable;
+}
+
         
         let sporadicDateCount = 0;
         let lastCalculation = {};
 
         // --- LÓGICA DO FORMULÁRIO ---
         document.addEventListener('DOMContentLoaded', () => {
+             // Desabilita o botão de calcular enquanto os preços são carregados
+    const calculateBtn = document.getElementById('calculate-btn');
+    calculateBtn.disabled = true;
+    calculateBtn.textContent = 'Carregando preços...';
+
+    fetchPriceTable(); // Chama a função para buscar os preços do Airtable
             const planSelect = document.getElementById('plan');
             const monthlyFields = document.getElementById('monthly-fields');
             const sporadicFields = document.getElementById('sporadic-fields');
             const addSporadicDateBtn = document.getElementById('add-sporadic-date');
-            const calculateBtn = document.getElementById('calculate-btn');
             const previewBtn = document.getElementById('preview-btn');
             const modal = document.getElementById('previewModal');
             const closeBtn = document.querySelector('.close-button');

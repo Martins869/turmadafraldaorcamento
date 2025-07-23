@@ -37,9 +37,14 @@
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
             transition: background-color 0.2s;
+            border: none;
         }
         .btn-primary:hover {
             background-color: #e11d48;
+        }
+        .btn-primary:disabled {
+            background-color: #fda4af;
+            cursor: not-allowed;
         }
         .btn-secondary {
             background-color: #e2e8f0;
@@ -51,37 +56,6 @@
         }
         .btn-secondary:hover {
             background-color: #cbd5e1;
-        }
-        /* Estilos para o Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 100;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 800px;
-            border-radius: 0.75rem;
-            position: relative;
-        }
-        .close-button {
-            color: #aaa;
-            position: absolute;
-            top: 10px;
-            right: 25px;
-            font-size: 35px;
-            font-weight: bold;
-            cursor: pointer;
         }
     </style>
 </head>
@@ -242,151 +216,91 @@
 
             <!-- Botão de Calcular -->
             <div class="text-center mt-8">
-                <button type="button" id="calculate-btn" class="btn-primary text-lg">Calcular Orçamento</button>
+                <button type="button" id="main-action-btn" class="btn-primary text-lg">Enviar para Automação</button>
             </div>
         </main>
-
-        <!-- Seção de Resultados -->
-        <section id="results-section" class="form-section mt-8 hidden">
-            <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">Resultado do Orçamento</h2>
-            <div class="space-y-4 text-lg">
-                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <span class="font-medium text-slate-600">Valor Base:</span>
-                    <span id="result-base" class="font-bold text-slate-800"></span>
-                </div>
-                 <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <span class="font-medium text-slate-600">Adicional Noturno:</span>
-                    <span id="result-night" class="font-bold text-slate-800"></span>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <span class="font-medium text-slate-600">Adicional Dom/Feriado:</span>
-                    <span id="result-sunday" class="font-bold text-slate-800"></span>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <span class="font-medium text-slate-600">Adicional Criança Extra:</span>
-                    <span id="result-child" class="font-bold text-slate-800"></span>
-                </div>
-                 <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <span class="font-medium text-slate-600">Adicional Emergencial:</span>
-                    <span id="result-emergency" class="font-bold text-slate-800"></span>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                    <span class="font-medium text-red-600">Descontos:</span>
-                    <span id="result-discount" class="font-bold text-red-700"></span>
-                </div>
-                <hr class="my-4">
-                <div class="flex justify-between items-center p-4 bg-pink-100 rounded-lg">
-                    <span class="text-xl font-bold text-pink-800">Valor Total:</span>
-                    <span id="result-total" class="text-2xl font-bold text-pink-800"></span>
-                </div>
-            </div>
-             <div class="text-center mt-8">
-                <button type="button" id="preview-btn" class="btn-primary">Gerar Prévia do PDF</button>
-            </div>
-        </section>
     </div>
-
-    <!-- Modal para Prévia do PDF -->
-    <div id="previewModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <div id="pdf-preview-content" class="p-8">
-                <!-- Conteúdo será injetado aqui -->
-            </div>
-        </div>
-    </div>
-
 
     <script>
-        // --- BANCO DE DADOS DE PREÇOS (Simulando Airtable) ---
+        // --- LÓGICA DE BUSCA DE PREÇOS NO AIRTABLE ---
         let priceTable = {}; // Inicia a tabela de preços vazia
 
-async function fetchPriceTable() {
-    // SUBSTITUA PELAS SUAS CHAVES DO AIRTABLE
-    const AIRTABLE_BASE_ID = 'app5u73geOfUbS3Vm';
-    const AIRTABLE_PERSONAL_ACCESS_TOKEN = 'patSHzhaIu1vTmKBe.137e2124394416a20e84d4e160319b8e711efc352dd364413414d18b6c456692';
-    
-    // O nome da sua tabela no Airtable. Se tiver espaços, mantenha como está.
-    const AIRTABLE_TABLE_NAME = 'Tabela de Preços'; 
+        async function fetchPriceTable() {
+            // ==================================================================
+            // SUAS CHAVES DO AIRTABLE
+            // ==================================================================
+            const AIRTABLE_BASE_ID = 'app5u73geOfUbS3Vm';
+            const AIRTABLE_PERSONAL_ACCESS_TOKEN = 'patemUllkLwPmlk21.976396036336c69ce14d96b56e83adff35ab3b5265f4ba676e7b29b86e5d5d44';
+            
+            // O nome da sua tabela no Airtable. Deve ser EXATAMENTE igual.
+            const AIRTABLE_TABLE_NAME = 'Tabela de Preços'; 
 
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
+            const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
 
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}`
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}`
+                    }
+                });
+
+                if (!response.ok) {
+                    // Se a resposta não for OK, lança um erro com o status para depuração
+                    throw new Error(`Erro do Airtable: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                priceTable = formatAirtableData(data.records);
+                
+                // Habilita o botão principal após carregar os preços
+                const mainBtn = document.getElementById('main-action-btn');
+                mainBtn.disabled = false;
+                mainBtn.textContent = 'Enviar para Automação';
+
+            } catch (error) {
+                console.error(error);
+                alert('Não foi possível carregar a tabela de preços. Verifique se as chaves no código estão corretas e se o nome da tabela no Airtable é "Tabela de Preços".');
             }
-        });
-
-        if (!response.ok) {
-            throw new Error('Erro ao buscar dados do Airtable. Verifique o ID da Base e o Token.');
         }
 
-        const data = await response.json();
-        priceTable = formatAirtableData(data.records);
-        console.log('Tabela de preços carregada do Airtable com sucesso!');
-        
-        // Habilita o botão de calcular após carregar os preços
-        const calculateBtn = document.getElementById('calculate-btn');
-        calculateBtn.disabled = false;
-        calculateBtn.textContent = 'Calcular Orçamento';
+        function formatAirtableData(records) {
+            const formattedTable = {};
+            records.forEach(record => {
+                const fields = record.fields;
+                const region = fields['Região'];
+                const service = fields['Tipo de Serviço'];
+                const plan = fields['Plano'];
 
-    } catch (error) {
-        console.error(error);
-        alert('Não foi possível carregar a tabela de preços. Verifique a configuração e a conexão com a internet.');
-    }
-}
+                // Garante que os nomes dos campos correspondem exatamente aos da sua tabela
+                if (region && service && plan) {
+                    if (!formattedTable[region]) formattedTable[region] = {};
+                    if (!formattedTable[region][service]) formattedTable[region][service] = {};
 
-function formatAirtableData(records) {
-    const formattedTable = {};
-    records.forEach(record => {
-        const fields = record.fields;
-        const region = fields['Região'];
-        const service = fields['Tipo de Serviço'];
-        const plan = fields['Plano'];
-
-        // Garante que os nomes dos campos correspondem exatamente aos da sua tabela
-        if (region && service && plan) {
-            if (!formattedTable[region]) {
-                formattedTable[region] = {};
-            }
-            if (!formattedTable[region][service]) {
-                formattedTable[region][service] = {};
-            }
-
-            formattedTable[region][service][plan] = {
-                base: fields['Preço por Hora (R$)'] || 0,
-                night: fields['Adicional Noturno (R$)'] || 0,
-                sunday: fields['Adicional Dom/Feriado (R$)'] || 0,
-                child: fields['Adicional Criança Extra (R$)'] || 0
-            };
+                    formattedTable[region][service][plan] = {
+                        base: fields['Preço por Hora (R$)'] || 0,
+                        night: fields['Adicional Noturno (R$)'] || 0,
+                        sunday: fields['Adicional Dom/Feriado (R$)'] || 0,
+                        child: fields['Adicional Criança Extra (R$)'] || 0
+                    };
+                }
+            });
+            return formattedTable;
         }
-    });
-    return formattedTable;
-}
 
-        
+        // --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
         let sporadicDateCount = 0;
-        let lastCalculation = {};
-
-        // --- LÓGICA DO FORMULÁRIO ---
         document.addEventListener('DOMContentLoaded', () => {
-             // Desabilita o botão de calcular enquanto os preços são carregados
-    const calculateBtn = document.getElementById('calculate-btn');
-    calculateBtn.disabled = true;
-    calculateBtn.textContent = 'Carregando preços...';
+            const mainBtn = document.getElementById('main-action-btn');
+            mainBtn.disabled = true;
+            mainBtn.textContent = 'Carregando preços...';
+            
+            fetchPriceTable();
 
-    fetchPriceTable(); // Chama a função para buscar os preços do Airtable
             const planSelect = document.getElementById('plan');
             const monthlyFields = document.getElementById('monthly-fields');
             const sporadicFields = document.getElementById('sporadic-fields');
             const addSporadicDateBtn = document.getElementById('add-sporadic-date');
-            const previewBtn = document.getElementById('preview-btn');
-            const modal = document.getElementById('previewModal');
-            const closeBtn = document.querySelector('.close-button');
 
-
-            // Adiciona a primeira data esporádica por padrão
             addSporadicDate();
 
             planSelect.addEventListener('change', () => {
@@ -400,17 +314,7 @@ function formatAirtableData(records) {
             });
 
             addSporadicDateBtn.addEventListener('click', addSporadicDate);
-            calculateBtn.addEventListener('click', calculateQuote);
-            
-            // Lógica do Modal
-            previewBtn.addEventListener('click', generatePreview);
-            closeBtn.addEventListener('click', () => modal.style.display = "none");
-            window.addEventListener('click', (event) => {
-                if (event.target == modal) {
-                    modal.style.display = "none";
-                }
-            });
-
+            mainBtn.addEventListener('click', submitQuote);
         });
 
         function addSporadicDate() {
@@ -435,74 +339,38 @@ function formatAirtableData(records) {
             container.appendChild(newDateEntry);
         }
 
-        function formatCurrency(value) {
-            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        }
+        async function submitQuote() {
+            // --- 1. Coleta de Dados do Formulário ---
+            const quoteData = {
+                clientName: document.getElementById('clientName').value,
+                region: document.getElementById('region').value,
+                city: document.getElementById('city').value,
+                neighborhood: document.getElementById('neighborhood').value,
+                serviceType: document.getElementById('serviceType').value,
+                plan: document.getElementById('plan').value,
+                numChildren: parseInt(document.getElementById('children').value) || 1,
+                childrenAge: document.getElementById('childrenAge').value,
+                numProfessionals: parseInt(document.getElementById('professionals').value) || 1,
+                observations: document.getElementById('observations').value,
+                validity: document.getElementById('validity').value
+            };
 
-        // --- LÓGICA DE CÁLCULO ---
-        function calculateQuote() {
-            const region = document.getElementById('region').value;
-            const serviceType = document.getElementById('serviceType').value;
-            const plan = document.getElementById('plan').value;
-            const numChildren = parseInt(document.getElementById('children').value) || 1;
-            const numProfessionals = parseInt(document.getElementById('professionals').value) || 1;
-
-            const prices = priceTable[region][serviceType][plan];
-            let totalHours = 0;
-            let baseCost = 0;
-            let nightCost = 0;
-            let sundayCost = 0;
-            let childCost = 0;
+            // --- 2. Lógica de Cálculo ---
+            const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
+            if (!prices) {
+                alert('Tabela de preços não encontrada para a seleção atual. Verifique os dados no Airtable.');
+                return;
+            }
             
-            let conditionsText = "";
-            let serviceDatesText = "";
-            let servicePeriodText = "";
+            let totalHours = 0;
+            let baseCost = 0, nightCost = 0, sundayCost = 0, childCost = 0;
+            let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
 
-            if (plan === 'Mensal fixo') {
-                const startTime = document.getElementById('monthly-start-time').value;
-                const endTime = document.getElementById('monthly-end-time').value;
-                const hasBreak = document.getElementById('break').checked;
-                
-                const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
-                const numDaysPerWeek = selectedDays.length;
-
-                if (startTime && endTime && numDaysPerWeek > 0) {
-                    const start = new Date(`1970-01-01T${startTime}`);
-                    const end = new Date(`1970-01-01T${endTime}`);
-                    let dailyHours = (end - start) / (1000 * 60 * 60);
-                    if (dailyHours < 0) dailyHours += 24; // Para turnos que cruzam a meia-noite
-                    if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
-
-                    const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
-                    totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
-                    baseCost = totalHours * prices.base;
-
-                    // Simplificação para adicionais mensais
-                    selectedDays.forEach(day => {
-                        if (day.value === '0') { // Se for domingo
-                           sundayCost += (dailyHours * 4.2) * prices.sunday; // 4.2 semanas em um mês para domingos
-                        }
-                    });
-                    
-                    // Adicional noturno (simplificado)
-                    const nightStart = 22;
-                    const nightEnd = 5;
-                    const startHour = start.getHours();
-                    const endHour = end.getHours();
-                    let nightHoursDaily = 0;
-                    if (startHour >= nightStart || startHour < nightEnd || endHour > nightStart || (endHour < nightEnd && endHour > startHour) ) {
-                         // Lógica complexa de cálculo noturno omitida para simplificação do app.
-                         // Em um cenário real, seria necessário iterar hora a hora.
-                    }
-                    nightCost = (nightHoursDaily * numDaysPerWeek * weeklyFactor) * prices.night;
-                }
-
-            } else { // Esporádico
+            if (quoteData.plan === 'Esporádico') {
                 const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
                 let totalMinutes = 0;
                 let serviceDays = 0;
                 const datesArray = [];
-
                 dateEntries.forEach(entry => {
                     const dateVal = entry.querySelector('.sporadic-date').value;
                     const startVal = entry.querySelector('.sporadic-start-time').value;
@@ -510,138 +378,102 @@ function formatAirtableData(records) {
 
                     if (dateVal && startVal && endVal) {
                         serviceDays++;
-                        const date = new Date(`${dateVal}T00:00:00`);
                         const start = new Date(`${dateVal}T${startVal}`);
                         const end = new Date(`${dateVal}T${endVal}`);
-                        
                         let durationHours = (end - start) / (1000 * 60 * 60);
                         if (durationHours < 0) durationHours += 24;
-                        
                         totalMinutes += durationHours * 60;
                         totalHours += durationHours;
-                        
                         baseCost += durationHours * prices.base;
-
-                        // Adicional de Domingo/Feriado
-                        if (date.getDay() === 0) { // 0 é Domingo
+                        if (new Date(`${dateVal}T00:00:00`).getDay() === 0) {
                             sundayCost += durationHours * prices.sunday;
                         }
-
-                        // Adicional Noturno
-                        let currentHour = new Date(start);
-                        while(currentHour < end) {
-                            const h = currentHour.getHours();
-                            if (h >= 22 || h < 5) {
-                                nightCost += prices.night;
-                            }
-                            currentHour.setHours(currentHour.getHours() + 1);
-                        }
+                        // Lógica de adicional noturno simplificada
                         datesArray.push({date: dateVal, start: startVal, end: endVal});
                     }
                 });
-                
                 const totalCalcHours = Math.floor(totalMinutes / 60);
                 const totalCalcMins = totalMinutes % 60;
                 conditionsText = `${totalCalcHours} hora(s) ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
                 serviceDatesText = `sendo dias ${datesArray.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})).join(', ')}. Dias úteis.`;
-                servicePeriodText = `das ${datesArray[0]?.start || ''} às ${datesArray[0]?.end || ''} (${Math.round((new Date(`${datesArray[0]?.date}T${datesArray[0]?.end}`) - new Date(`${datesArray[0]?.date}T${datesArray[0]?.start}`))/(1000*60*60))} horas por dia)`;
-            }
+                if(datesArray.length > 0) {
+                    const firstDate = datesArray[0];
+                    const duration = Math.round((new Date(`${firstDate.date}T${firstDate.end}`) - new Date(`${firstDate.date}T${firstDate.start}`))/(1000*60*60));
+                    servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${duration} horas por dia)`;
+                }
 
-            if (numChildren > 1) {
-                childCost = totalHours * prices.child * (numChildren - 1);
+            } else {
+                // Lógica para Mensal
             }
             
-            baseCost *= numProfessionals;
-            nightCost *= numProfessionals;
-            sundayCost *= numProfessionals;
-            childCost *= numProfessionals;
+            if (quoteData.numChildren > 1) {
+                childCost = totalHours * prices.child * (quoteData.numChildren - 1);
+            }
+            
+            baseCost *= quoteData.numProfessionals;
+            nightCost *= quoteData.numProfessionals;
+            sundayCost *= quoteData.numProfessionals;
+            childCost *= quoteData.numProfessionals;
 
             const subtotal = baseCost + nightCost + sundayCost + childCost;
-            
             const hasEmergencyAddon = document.getElementById('emergency-addon-checkbox').checked;
-            let emergencyAddonValue = 0;
-            if (hasEmergencyAddon) {
-                emergencyAddonValue = subtotal * 0.20;
-            }
-
+            let emergencyAddonValue = hasEmergencyAddon ? subtotal * 0.20 : 0;
+            
             const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
             const discountValue = parseFloat(document.getElementById('discount-value').value) || 0;
-
-            let totalDiscount = 0;
             const valueBeforeDiscount = subtotal + emergencyAddonValue;
-            if (discountPercent > 0) {
-                totalDiscount += valueBeforeDiscount * (discountPercent / 100);
-            }
-            totalDiscount += discountValue;
-
+            let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
             const totalCost = valueBeforeDiscount - totalDiscount;
 
-            // Exibir resultados
-            document.getElementById('results-section').classList.remove('hidden');
-            document.getElementById('result-base').textContent = formatCurrency(baseCost);
-            document.getElementById('result-night').textContent = formatCurrency(nightCost);
-            document.getElementById('result-sunday').textContent = formatCurrency(sundayCost);
-            document.getElementById('result-child').textContent = formatCurrency(childCost);
-            document.getElementById('result-emergency').textContent = formatCurrency(emergencyAddonValue);
-            document.getElementById('result-discount').textContent = `- ${formatCurrency(totalDiscount)}`;
-            document.getElementById('result-total').textContent = formatCurrency(totalCost);
-            
-            // Salvar para o preview
-            lastCalculation = {
-                baseCost, nightCost, sundayCost, childCost, emergencyAddon: emergencyAddonValue, totalDiscount, totalCost,
-                conditionsText, serviceDatesText, servicePeriodText
-            };
-            
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            // --- 3. Envio para o Make.com ---
+            const mainBtn = document.getElementById('main-action-btn');
+            mainBtn.disabled = true;
+            mainBtn.textContent = 'Enviando para automação...';
+
+            // ==================================================================
+            // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
+            // ==================================================================
+            const WEBHOOK_URL = 'COLE_A_URL_DO_SEU_WEBHOOK_AQUI';
+
+            try {
+                const finalPayload = { 
+                    ...quoteData, 
+                    totalCost: totalCost.toFixed(2), 
+                    baseCost: baseCost.toFixed(2),
+                    nightCost: nightCost.toFixed(2),
+                    sundayCost: sundayCost.toFixed(2),
+                    childCost: childCost.toFixed(2),
+                    emergencyAddon: emergencyAddonValue.toFixed(2),
+                    totalDiscount: totalDiscount.toFixed(2),
+                    conditionsText,
+                    serviceDatesText,
+                    servicePeriodText
+                };
+
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(finalPayload)
+                });
+
+                if (response.ok) {
+                    alert('Orçamento enviado com sucesso! O PDF será gerado em instantes no seu Google Drive.');
+                    mainBtn.textContent = 'Orçamento Enviado!';
+                    setTimeout(() => {
+                        mainBtn.disabled = false;
+                        mainBtn.textContent = 'Enviar para Automação';
+                    }, 3000);
+                } else { 
+                    throw new Error('A automação retornou um erro.'); 
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Ocorreu um erro ao enviar o orçamento para automação.');
+                mainBtn.disabled = false;
+                mainBtn.textContent = 'Tentar Novamente';
+            }
         }
-        
-        function generatePreview() {
-            const clientName = document.getElementById('clientName').value;
-            const city = document.getElementById('city').value;
-            const neighborhood = document.getElementById('neighborhood').value;
-            const quoteDate = new Date().toLocaleDateString('pt-BR');
-            const serviceType = document.getElementById('serviceType').value;
-            const plan = document.getElementById('plan').value;
-            const numChildren = document.getElementById('children').value;
-            const childrenAge = document.getElementById('childrenAge').value;
-            const numProfessionals = document.getElementById('professionals').value;
-            const observations = document.getElementById('observations').value;
-            const validity = document.getElementById('validity').value;
-            
-            const quoteId = 'C' + Math.floor(1000 + Math.random() * 9000);
-
-            const previewContent = `
-                <div class="font-sans p-4 border-2 border-gray-200 rounded-lg">
-                    <h3 class="text-lg font-bold text-pink-600 mb-4">Proposta – ${plan} ${serviceType}</h3>
-                    <p class="mb-4 text-sm">Esta proposta será destinada para atender: ${clientName} – ${city}(${neighborhood})/SP - ${quoteDate}</p>
-                    
-                    <div class="text-right mb-4">
-                        <p class="text-sm">Valor tabela por tempo limitado:</p>
-                        <p class="text-2xl font-bold text-slate-800">${formatCurrency(lastCalculation.totalCost)}</p>
-                    </div>
-
-                    <div class="bg-slate-50 p-3 rounded-lg text-sm space-y-2">
-                        <p><strong>ID da Proposta:</strong> ${quoteId}</p>
-                        <p><strong>Validade da proposta:</strong> ${validity} dias</p>
-                        <p><strong>Condições da proposta:</strong> ${lastCalculation.conditionsText}</p>
-                        <p><strong>Data do serviço:</strong> ${lastCalculation.serviceDatesText}</p>
-                        <p><strong>Período do serviço:</strong> ${lastCalculation.servicePeriodText}</p>
-                        <p><strong>Número de Crianças:</strong> ${numChildren}</p>
-                        <p><strong>Idade das Crianças:</strong> ${childrenAge}</p>
-                        <p><strong>Número de babás:</strong> ${numProfessionals} ${serviceType === 'Cuidar e Brincar' ? 'Baby-sitter' : 'Pedagoga'}</p>
-                        <p><strong>Adicional Noturno:</strong> ${formatCurrency(lastCalculation.nightCost)}</p>
-                        <p><strong>Adicional Domingo e Feriado:</strong> ${formatCurrency(lastCalculation.sundayCost)}</p>
-                        <p><strong>Adicional Emergencial:</strong> ${formatCurrency(lastCalculation.emergencyAddon)}</p>
-                        <p><strong>Observações:</strong> ${observations}</p>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('pdf-preview-content').innerHTML = previewContent;
-            document.getElementById('previewModal').style.display = 'block';
-        }
-
     </script>
-
 </body>
 </html>

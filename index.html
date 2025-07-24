@@ -130,7 +130,7 @@
                 <div id="monthly-fields" class="hidden">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                          <div>
-                            <label for="monthly-days" class="block mb-1 font-medium text-slate-600">Dias da Semana</label>
+                            <label class="block mb-1 font-medium text-slate-600">Dias da Semana</label>
                             <div id="monthly-days-checkboxes" class="flex flex-wrap gap-x-4 gap-y-2">
                                 <label class="flex items-center"><input type="checkbox" value="1" class="mr-2">Seg</label>
                                 <label class="flex items-center"><input type="checkbox" value="2" class="mr-2">Ter</label>
@@ -213,8 +213,7 @@
                 </div>
             </section>
 
-
-            <!-- Botão de Calcular -->
+            <!-- Botão de Ação Principal -->
             <div class="text-center mt-8">
                 <button type="button" id="main-action-btn" class="btn-primary text-lg">Enviar para Automação</button>
             </div>
@@ -222,40 +221,33 @@
     </div>
 
     <script>
-        // --- LÓGICA DE BUSCA DE PREÇOS NO AIRTABLE ---
-        let priceTable = {}; // Inicia a tabela de preços vazia
+        let priceTable = {};
         let sporadicDateCount = 0;
 
         async function fetchPriceTable() {
+            const mainBtn = document.getElementById('main-action-btn');
+            mainBtn.disabled = true;
+            mainBtn.textContent = 'Carregando preços...';
+
             // ==================================================================
-            // ATENÇÃO: SUBSTITUA PELAS SUAS CHAVES REAIS DO AIRTABLE
+            // SUAS CHAVES DO AIRTABLE
             // ==================================================================
             const AIRTABLE_BASE_ID = 'app5u73geOfUbS3Vm';
             const AIRTABLE_PERSONAL_ACCESS_TOKEN = 'patemUllkLwPmlk21.976396036336c69ce14d96b56e83adff35ab3b5265f4ba676e7b29b86e5d5d44';
-            
             const AIRTABLE_TABLE_NAME = 'Tabela de Preços'; 
 
             const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
 
             try {
-                const response = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}` }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Erro do Airtable: ${response.status} ${response.statusText}`);
-                }
-
+                const response = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}` } });
+                if (!response.ok) throw new Error(`Erro do Airtable: ${response.status}`);
                 const data = await response.json();
                 priceTable = formatAirtableData(data.records);
-                
-                const mainBtn = document.getElementById('main-action-btn');
                 mainBtn.disabled = false;
                 mainBtn.textContent = 'Enviar para Automação';
-
             } catch (error) {
                 console.error(error);
-                alert('Não foi possível carregar a tabela de preços. Verifique se as chaves no código estão corretas e se o nome da tabela no Airtable é "Tabela de Preços".');
+                alert('Não foi possível carregar a tabela de preços. Verifique as chaves e o nome da tabela no Airtable.');
             }
         }
 
@@ -272,29 +264,17 @@
             return formattedTable;
         }
 
-        // --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
         document.addEventListener('DOMContentLoaded', () => {
-            const mainBtn = document.getElementById('main-action-btn');
-            mainBtn.disabled = true;
-            mainBtn.textContent = 'Carregando preços...';
-            
             fetchPriceTable();
-
             const planSelect = document.getElementById('plan');
-            const monthlyFields = document.getElementById('monthly-fields');
-            const sporadicFields = document.getElementById('sporadic-fields');
-            const addSporadicDateBtn = document.getElementById('add-sporadic-date');
-
-            addSporadicDate();
-
             planSelect.addEventListener('change', () => {
                 const isMonthly = planSelect.value === 'Mensal fixo';
-                monthlyFields.classList.toggle('hidden', !isMonthly);
-                sporadicFields.classList.toggle('hidden', isMonthly);
+                document.getElementById('monthly-fields').classList.toggle('hidden', !isMonthly);
+                document.getElementById('sporadic-fields').classList.toggle('hidden', isMonthly);
             });
-
-            addSporadicDateBtn.addEventListener('click', addSporadicDate);
-            mainBtn.addEventListener('click', submitQuote);
+            document.getElementById('add-sporadic-date').addEventListener('click', addSporadicDate);
+            document.getElementById('main-action-btn').addEventListener('click', submitQuote);
+            addSporadicDate(); // Adiciona a primeira data por padrão
         });
 
         function addSporadicDate() {
@@ -303,45 +283,23 @@
             const newDateEntry = document.createElement('div');
             newDateEntry.classList.add('grid', 'grid-cols-1', 'md:grid-cols-3', 'gap-4', 'mb-2');
             newDateEntry.innerHTML = `
-                <div>
-                    <label class="block mb-1 text-sm font-medium text-slate-500">Data ${sporadicDateCount}</label>
-                    <input type="date" class="form-input sporadic-date">
-                </div>
-                <div>
-                    <label class="block mb-1 text-sm font-medium text-slate-500">Entrada</label>
-                    <input type="time" class="form-input sporadic-start-time">
-                </div>
-                <div>
-                    <label class="block mb-1 text-sm font-medium text-slate-500">Saída</label>
-                    <input type="time" class="form-input sporadic-end-time">
-                </div>
+                <div><label class="block mb-1 text-sm font-medium text-slate-500">Data ${sporadicDateCount}</label><input type="date" class="form-input sporadic-date"></div>
+                <div><label class="block mb-1 text-sm font-medium text-slate-500">Entrada</label><input type="time" class="form-input sporadic-start-time"></div>
+                <div><label class="block mb-1 text-sm font-medium text-slate-500">Saída</label><input type="time" class="form-input sporadic-end-time"></div>
             `;
             container.appendChild(newDateEntry);
         }
 
-        // --- FUNÇÕES DE CÁLCULO CORRIGIDAS ---
-
-        /**
-         * Calcula as horas noturnas (entre 22h e 5h) para um determinado turno.
-         * @param {Date} start - Objeto Date de início.
-         * @param {Date} end - Objeto Date de fim.
-         * @returns {number} - Total de horas noturnas.
-         */
         function calculateNightHours(start, end) {
             let nightHours = 0;
             let current = new Date(start);
-
             while (current < end) {
                 let next = new Date(current);
-                next.setHours(next.getHours() + 1);
+                next.setMinutes(next.getMinutes() + 1); // Itera minuto a minuto para precisão
                 if (next > end) next = end;
-
                 const currentHour = current.getHours();
-                const isNight = currentHour >= 22 || currentHour < 5;
-                
-                if (isNight) {
-                    const diff = (next - current) / (1000 * 60 * 60); // Diferença em horas
-                    nightHours += diff;
+                if (currentHour >= 22 || currentHour < 5) {
+                    nightHours += (next - current) / (1000 * 60 * 60); // Adiciona fração de hora
                 }
                 current = next;
             }
@@ -349,7 +307,10 @@
         }
 
         async function submitQuote() {
-            // --- 1. Coleta de Dados do Formulário ---
+            const mainBtn = document.getElementById('main-action-btn');
+            mainBtn.disabled = true;
+            mainBtn.textContent = 'Enviando para automação...';
+
             const quoteData = {
                 clientName: document.getElementById('clientName').value,
                 region: document.getElementById('region').value,
@@ -364,10 +325,10 @@
                 validity: document.getElementById('validity').value
             };
 
-            // --- 2. Lógica de Cálculo ---
             const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
             if (!prices) {
-                alert('Tabela de preços não encontrada para a seleção atual. Verifique os dados no Airtable.');
+                alert('Tabela de preços não encontrada. Verifique os dados no Airtable.');
+                mainBtn.disabled = false; mainBtn.textContent = 'Tentar Novamente';
                 return;
             }
             
@@ -376,31 +337,22 @@
 
             if (quoteData.plan === 'Esporádico') {
                 const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
-                let totalMinutes = 0;
-                let serviceDays = 0;
+                let totalMinutes = 0, serviceDays = 0;
                 const datesArray = [];
                 
                 dateEntries.forEach(entry => {
-                    const dateVal = entry.querySelector('.sporadic-date').value;
-                    const startVal = entry.querySelector('.sporadic-start-time').value;
-                    const endVal = entry.querySelector('.sporadic-end-time').value;
-
+                    const dateVal = entry.querySelector('.sporadic-date').value, startVal = entry.querySelector('.sporadic-start-time').value, endVal = entry.querySelector('.sporadic-end-time').value;
                     if (dateVal && startVal && endVal) {
                         serviceDays++;
                         const start = new Date(`${dateVal}T${startVal}`);
                         let end = new Date(`${dateVal}T${endVal}`);
-                        if (end < start) end.setDate(end.getDate() + 1); // Turno que vira a noite
-
+                        if (end < start) end.setDate(end.getDate() + 1);
                         const durationMillis = end - start;
                         const durationHours = durationMillis / (1000 * 60 * 60);
-                        
                         totalMinutes += durationMillis / (1000 * 60);
                         totalHours += durationHours;
-                        
                         totalNightHours += calculateNightHours(start, end);
-                        if (start.getDay() === 0) { // 0 é Domingo
-                            totalSundayHours += durationHours;
-                        }
+                        if (start.getDay() === 0) totalSundayHours += durationHours;
                         datesArray.push({date: dateVal, start: startVal, end: endVal, duration: durationHours});
                     }
                 });
@@ -414,38 +366,25 @@
                     const durationM = Math.round((firstDate.duration % 1) * 60);
                     servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia)`;
                 }
-
             } else { // Mensal
-                const startTime = document.getElementById('monthly-start-time').value;
-                const endTime = document.getElementById('monthly-end-time').value;
+                const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
                 const hasBreak = document.getElementById('break').checked;
                 const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
                 const numDaysPerWeek = selectedDays.length;
-                
                 if (startTime && endTime && numDaysPerWeek > 0) {
                     const start = new Date(`1970-01-01T${startTime}`);
                     let end = new Date(`1970-01-01T${endTime}`);
                     if (end < start) end.setDate(end.getDate() + 1);
-
                     let dailyHours = (end - start) / (1000 * 60 * 60);
                     if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
-                    
                     const dailyNightHours = calculateNightHours(start, end);
-
                     const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
                     totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
                     totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
-                    
-                    selectedDays.forEach(day => {
-                        if (day.value === '0') { // Domingo
-                           totalSundayHours += dailyHours * 4.2; // 4.2 semanas em um mês para domingos
-                        }
-                    });
-
+                    selectedDays.forEach(day => { if (day.value === '0') totalSundayHours += dailyHours * 4.2; });
                     const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
-                    const selectedDayNames = selectedDays.map(d => dayNames[d.value]).join(', ');
                     conditionsText = `Contrato para atendimento fixo mensal.`;
-                    serviceDatesText = `Atendimento de ${selectedDayNames}.`;
+                    serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}.`;
                     const durationH = Math.floor(dailyHours);
                     const durationM = Math.round((dailyHours % 1) * 60);
                     servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
@@ -465,52 +404,25 @@
             const subtotal = baseCost + nightCost + sundayCost + childCost;
             const hasEmergencyAddon = document.getElementById('emergency-addon-checkbox').checked;
             let emergencyAddonValue = hasEmergencyAddon ? subtotal * 0.20 : 0;
-            
             const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
             const discountValue = parseFloat(document.getElementById('discount-value').value) || 0;
             const valueBeforeDiscount = subtotal + emergencyAddonValue;
             let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
             const totalCost = valueBeforeDiscount - totalDiscount;
 
-            // --- 3. Envio para o Make.com ---
-            const mainBtn = document.getElementById('main-action-btn');
-            mainBtn.disabled = true;
-            mainBtn.textContent = 'Enviando para automação...';
-
+            // ==================================================================
+            // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
+            // ==================================================================
             const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1lllrtaddq';
 
             try {
-                const finalPayload = { 
-                    ...quoteData, 
-                    totalCost: totalCost.toFixed(2), 
-                    baseCost: baseCost.toFixed(2),
-                    nightCost: nightCost.toFixed(2),
-                    sundayCost: sundayCost.toFixed(2),
-                    childCost: childCost.toFixed(2),
-                    emergencyAddon: emergencyAddonValue.toFixed(2),
-                    totalDiscount: totalDiscount.toFixed(2),
-                    conditionsText,
-                    serviceDatesText,
-                    servicePeriodText
-                };
-
-                const response = await fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(finalPayload)
-                });
-
+                const finalPayload = { ...quoteData, totalCost: totalCost.toFixed(2), baseCost: baseCost.toFixed(2), nightCost: nightCost.toFixed(2), sundayCost: sundayCost.toFixed(2), childCost: childCost.toFixed(2), emergencyAddon: emergencyAddonValue.toFixed(2), totalDiscount: totalDiscount.toFixed(2), conditionsText, serviceDatesText, servicePeriodText };
+                const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalPayload) });
                 if (response.ok) {
                     alert('Orçamento enviado com sucesso! O PDF será gerado em instantes no seu Google Drive.');
                     mainBtn.textContent = 'Orçamento Enviado!';
-                    setTimeout(() => {
-                        mainBtn.disabled = false;
-                        mainBtn.textContent = 'Enviar para Automação';
-                    }, 3000);
-                } else { 
-                    throw new Error('A automação retornou um erro.'); 
-                }
-
+                    setTimeout(() => { mainBtn.disabled = false; mainBtn.textContent = 'Enviar para Automação'; }, 3000);
+                } else { throw new Error('A automação retornou um erro.'); }
             } catch (error) {
                 console.error(error);
                 alert('Ocorreu um erro ao enviar o orçamento para automação.');

@@ -224,35 +224,31 @@
     <script>
         // --- LÓGICA DE BUSCA DE PREÇOS NO AIRTABLE ---
         let priceTable = {}; // Inicia a tabela de preços vazia
+        let sporadicDateCount = 0;
 
         async function fetchPriceTable() {
             // ==================================================================
-            // SUAS CHAVES DO AIRTABLE
+            // ATENÇÃO: SUBSTITUA PELAS SUAS CHAVES REAIS DO AIRTABLE
             // ==================================================================
             const AIRTABLE_BASE_ID = 'app5u73geOfUbS3Vm';
             const AIRTABLE_PERSONAL_ACCESS_TOKEN = 'patemUllkLwPmlk21.976396036336c69ce14d96b56e83adff35ab3b5265f4ba676e7b29b86e5d5d44';
             
-            // O nome da sua tabela no Airtable. Deve ser EXATAMENTE igual.
             const AIRTABLE_TABLE_NAME = 'Tabela de Preços'; 
 
             const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
 
             try {
                 const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}`
-                    }
+                    headers: { 'Authorization': `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}` }
                 });
 
                 if (!response.ok) {
-                    // Se a resposta não for OK, lança um erro com o status para depuração
                     throw new Error(`Erro do Airtable: ${response.status} ${response.statusText}`);
                 }
 
                 const data = await response.json();
                 priceTable = formatAirtableData(data.records);
                 
-                // Habilita o botão principal após carregar os preços
                 const mainBtn = document.getElementById('main-action-btn');
                 mainBtn.disabled = false;
                 mainBtn.textContent = 'Enviar para Automação';
@@ -266,29 +262,17 @@
         function formatAirtableData(records) {
             const formattedTable = {};
             records.forEach(record => {
-                const fields = record.fields;
-                const region = fields['Região'];
-                const service = fields['Tipo de Serviço'];
-                const plan = fields['Plano'];
-
-                // Garante que os nomes dos campos correspondem exatamente aos da sua tabela
-                if (region && service && plan) {
-                    if (!formattedTable[region]) formattedTable[region] = {};
-                    if (!formattedTable[region][service]) formattedTable[region][service] = {};
-
-                    formattedTable[region][service][plan] = {
-                        base: fields['Preço por Hora (R$)'] || 0,
-                        night: fields['Adicional Noturno (R$)'] || 0,
-                        sunday: fields['Adicional Dom/Feriado (R$)'] || 0,
-                        child: fields['Adicional Criança Extra (R$)'] || 0
-                    };
+                const { Região, "Tipo de Serviço": service, Plano, "Preço por Hora (R$)": base, "Adicional Noturno (R$)": night, "Adicional Dom/Feriado (R$)": sunday, "Adicional Criança Extra (R$)": child } = record.fields;
+                if (Região && service && Plano) {
+                    if (!formattedTable[Região]) formattedTable[Região] = {};
+                    if (!formattedTable[Região][service]) formattedTable[Região][service] = {};
+                    formattedTable[Região][service][Plano] = { base: base || 0, night: night || 0, sunday: sunday || 0, child: child || 0 };
                 }
             });
             return formattedTable;
         }
 
         // --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
-        let sporadicDateCount = 0;
         document.addEventListener('DOMContentLoaded', () => {
             const mainBtn = document.getElementById('main-action-btn');
             mainBtn.disabled = true;
@@ -304,13 +288,9 @@
             addSporadicDate();
 
             planSelect.addEventListener('change', () => {
-                if (planSelect.value === 'Mensal fixo') {
-                    monthlyFields.classList.remove('hidden');
-                    sporadicFields.classList.add('hidden');
-                } else {
-                    monthlyFields.classList.add('hidden');
-                    sporadicFields.classList.remove('hidden');
-                }
+                const isMonthly = planSelect.value === 'Mensal fixo';
+                monthlyFields.classList.toggle('hidden', !isMonthly);
+                sporadicFields.classList.toggle('hidden', isMonthly);
             });
 
             addSporadicDateBtn.addEventListener('click', addSporadicDate);
@@ -339,6 +319,35 @@
             container.appendChild(newDateEntry);
         }
 
+        // --- FUNÇÕES DE CÁLCULO CORRIGIDAS ---
+
+        /**
+         * Calcula as horas noturnas (entre 22h e 5h) para um determinado turno.
+         * @param {Date} start - Objeto Date de início.
+         * @param {Date} end - Objeto Date de fim.
+         * @returns {number} - Total de horas noturnas.
+         */
+        function calculateNightHours(start, end) {
+            let nightHours = 0;
+            let current = new Date(start);
+
+            while (current < end) {
+                let next = new Date(current);
+                next.setHours(next.getHours() + 1);
+                if (next > end) next = end;
+
+                const currentHour = current.getHours();
+                const isNight = currentHour >= 22 || currentHour < 5;
+                
+                if (isNight) {
+                    const diff = (next - current) / (1000 * 60 * 60); // Diferença em horas
+                    nightHours += diff;
+                }
+                current = next;
+            }
+            return nightHours;
+        }
+
         async function submitQuote() {
             // --- 1. Coleta de Dados do Formulário ---
             const quoteData = {
@@ -362,8 +371,7 @@
                 return;
             }
             
-            let totalHours = 0;
-            let baseCost = 0, nightCost = 0, sundayCost = 0, childCost = 0;
+            let totalHours = 0, totalNightHours = 0, totalSundayHours = 0;
             let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
 
             if (quoteData.plan === 'Esporádico') {
@@ -371,6 +379,7 @@
                 let totalMinutes = 0;
                 let serviceDays = 0;
                 const datesArray = [];
+                
                 dateEntries.forEach(entry => {
                     const dateVal = entry.querySelector('.sporadic-date').value;
                     const startVal = entry.querySelector('.sporadic-start-time').value;
@@ -379,36 +388,74 @@
                     if (dateVal && startVal && endVal) {
                         serviceDays++;
                         const start = new Date(`${dateVal}T${startVal}`);
-                        const end = new Date(`${dateVal}T${endVal}`);
-                        let durationHours = (end - start) / (1000 * 60 * 60);
-                        if (durationHours < 0) durationHours += 24;
-                        totalMinutes += durationHours * 60;
+                        let end = new Date(`${dateVal}T${endVal}`);
+                        if (end < start) end.setDate(end.getDate() + 1); // Turno que vira a noite
+
+                        const durationMillis = end - start;
+                        const durationHours = durationMillis / (1000 * 60 * 60);
+                        
+                        totalMinutes += durationMillis / (1000 * 60);
                         totalHours += durationHours;
-                        baseCost += durationHours * prices.base;
-                        if (new Date(`${dateVal}T00:00:00`).getDay() === 0) {
-                            sundayCost += durationHours * prices.sunday;
+                        
+                        totalNightHours += calculateNightHours(start, end);
+                        if (start.getDay() === 0) { // 0 é Domingo
+                            totalSundayHours += durationHours;
                         }
-                        // Lógica de adicional noturno simplificada
-                        datesArray.push({date: dateVal, start: startVal, end: endVal});
+                        datesArray.push({date: dateVal, start: startVal, end: endVal, duration: durationHours});
                     }
                 });
                 const totalCalcHours = Math.floor(totalMinutes / 60);
-                const totalCalcMins = totalMinutes % 60;
-                conditionsText = `${totalCalcHours} hora(s) ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
-                serviceDatesText = `sendo dias ${datesArray.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})).join(', ')}. Dias úteis.`;
+                const totalCalcMins = Math.round(totalMinutes % 60);
+                conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
+                serviceDatesText = `sendo dias ${datesArray.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})).join(', ')}.`;
                 if(datesArray.length > 0) {
                     const firstDate = datesArray[0];
-                    const duration = Math.round((new Date(`${firstDate.date}T${firstDate.end}`) - new Date(`${firstDate.date}T${firstDate.start}`))/(1000*60*60));
-                    servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${duration} horas por dia)`;
+                    const durationH = Math.floor(firstDate.duration);
+                    const durationM = Math.round((firstDate.duration % 1) * 60);
+                    servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia)`;
                 }
 
-            } else {
-                // Lógica para Mensal
+            } else { // Mensal
+                const startTime = document.getElementById('monthly-start-time').value;
+                const endTime = document.getElementById('monthly-end-time').value;
+                const hasBreak = document.getElementById('break').checked;
+                const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
+                const numDaysPerWeek = selectedDays.length;
+                
+                if (startTime && endTime && numDaysPerWeek > 0) {
+                    const start = new Date(`1970-01-01T${startTime}`);
+                    let end = new Date(`1970-01-01T${endTime}`);
+                    if (end < start) end.setDate(end.getDate() + 1);
+
+                    let dailyHours = (end - start) / (1000 * 60 * 60);
+                    if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
+                    
+                    const dailyNightHours = calculateNightHours(start, end);
+
+                    const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
+                    totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
+                    totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
+                    
+                    selectedDays.forEach(day => {
+                        if (day.value === '0') { // Domingo
+                           totalSundayHours += dailyHours * 4.2; // 4.2 semanas em um mês para domingos
+                        }
+                    });
+
+                    const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
+                    const selectedDayNames = selectedDays.map(d => dayNames[d.value]).join(', ');
+                    conditionsText = `Contrato para atendimento fixo mensal.`;
+                    serviceDatesText = `Atendimento de ${selectedDayNames}.`;
+                    const durationH = Math.floor(dailyHours);
+                    const durationM = Math.round((dailyHours % 1) * 60);
+                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
+                }
             }
             
-            if (quoteData.numChildren > 1) {
-                childCost = totalHours * prices.child * (quoteData.numChildren - 1);
-            }
+            let baseCost = totalHours * prices.base;
+            let nightCost = totalNightHours * prices.night;
+            let sundayCost = totalSundayHours * prices.sunday;
+            let childCost = (quoteData.numChildren > 1) ? totalHours * prices.child * (quoteData.numChildren - 1) : 0;
             
             baseCost *= quoteData.numProfessionals;
             nightCost *= quoteData.numProfessionals;
@@ -430,10 +477,7 @@
             mainBtn.disabled = true;
             mainBtn.textContent = 'Enviando para automação...';
 
-            // ==================================================================
-            // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
-            // ==================================================================
-            const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1lllrtaddq';
+            const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1llrtaddq';
 
             try {
                 const finalPayload = { 

@@ -318,130 +318,131 @@
             mainBtn.disabled = true;
             mainBtn.textContent = 'Enviando para automação...';
 
-            const quoteData = {
-                clientName: document.getElementById('clientName').value,
-                region: document.getElementById('region').value,
-                city: document.getElementById('city').value,
-                neighborhood: document.getElementById('neighborhood').value,
-                serviceType: document.getElementById('serviceType').value,
-                plan: document.getElementById('plan').value,
-                numChildren: parseInt(document.getElementById('children').value) || 1,
-                childrenAge: document.getElementById('childrenAge').value,
-                numProfessionals: parseInt(document.getElementById('professionals').value) || 1,
-                observations: document.getElementById('observations').value,
-                validity: document.getElementById('validity').value,
-                contractDuration: document.getElementById('contract-duration').value,
-                startDate: document.getElementById('start-date').value
-            };
-
-            const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
-            if (!prices) {
-                alert('Tabela de preços não encontrada. Verifique os dados no Airtable.');
-                mainBtn.disabled = false; mainBtn.textContent = 'Tentar Novamente';
-                return;
-            }
-            
-            let totalHours = 0, totalNightHours = 0, totalSundayHours = 0;
-            let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
-
-            if (quoteData.plan === 'Esporádico') {
-                const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
-                let totalMinutes = 0, serviceDays = 0;
-                const datesArray = [];
-                
-                dateEntries.forEach(entry => {
-                    const dateVal = entry.querySelector('.sporadic-date').value, startVal = entry.querySelector('.sporadic-start-time').value, endVal = entry.querySelector('.sporadic-end-time').value;
-                    if (dateVal && startVal && endVal) {
-                        serviceDays++;
-                        const start = new Date(`${dateVal}T${startVal}`);
-                        let end = new Date(`${dateVal}T${endVal}`);
-                        if (end < start) end.setDate(end.getDate() + 1);
-                        const durationMillis = end - start;
-                        const durationHours = durationMillis / (1000 * 60 * 60);
-                        totalMinutes += durationMillis / (1000 * 60);
-                        totalHours += durationHours;
-                        totalNightHours += calculateNightHours(start, end);
-                        if (start.getDay() === 0) totalSundayHours += durationHours;
-                        datesArray.push({date: dateVal, start: startVal, end: endVal, duration: durationHours});
-                    }
-                });
-                const totalCalcHours = Math.floor(totalMinutes / 60);
-                const totalCalcMins = Math.round(totalMinutes % 60);
-                conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
-                serviceDatesText = `sendo dias ${datesArray.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})).join(', ')}.`;
-                if(datesArray.length > 0) {
-                    const firstDate = datesArray[0];
-                    const durationH = Math.floor(firstDate.duration);
-                    const durationM = Math.round((firstDate.duration % 1) * 60);
-                    servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia)`;
-                }
-            } else { // Mensal
-                const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
-                const hasBreak = document.getElementById('break').checked;
-                const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
-                const numDaysPerWeek = selectedDays.length;
-                if (startTime && endTime && numDaysPerWeek > 0) {
-                    const start = new Date(`1970-01-01T${startTime}`);
-                    let end = new Date(`1970-01-01T${endTime}`);
-                    if (end < start) end.setDate(end.getDate() + 1);
-                    let dailyHours = (end - start) / (1000 * 60 * 60);
-                    if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
-                    const dailyNightHours = calculateNightHours(start, end);
-                    const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
-                    totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
-                    totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
-                    let includesWeekend = false;
-                    selectedDays.forEach(day => { if (day.value === '0') {
-                        totalSundayHours += dailyHours * 4.2;
-                        includesWeekend = true;
-                    }});
-                    const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
-                    const startDate = new Date(quoteData.startDate + '-02T00:00:00');
-                    const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' });
-                    const startYear = startDate.getFullYear();
-                    conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
-                    serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
-                    const durationH = Math.floor(dailyHours);
-                    const durationM = Math.round((dailyHours % 1) * 60);
-                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
-                }
-            }
-            
-            const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
-            let baseCost = totalHours * prices.base;
-            let nightCost = totalNightHours * prices.night;
-            let sundayCost = totalSundayHours * prices.sunday;
-            let childCost = (quoteData.numChildren > 1) ? totalHours * prices.child * (quoteData.numChildren - 1) : 0;
-            
-            baseCost *= quoteData.numProfessionals;
-            nightCost *= quoteData.numProfessionals;
-            sundayCost *= quoteData.numProfessionals;
-            childCost *= quoteData.numProfessionals;
-
-            const subtotal = baseCost + nightCost + sundayCost + childCost;
-            const hasEmergencyAddon = document.getElementById('emergency-addon-checkbox').checked;
-            let emergencyAddonValue = hasEmergencyAddon ? subtotal * 0.20 : 0;
-            const discountValue = parseFloat(document.getElementById('discount-value').value) || 0;
-            const valueBeforeDiscount = subtotal + emergencyAddonValue;
-            let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
-            const totalCost = valueBeforeDiscount - totalDiscount;
-
-            // ==================================================================
-            // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
-            // ==================================================================
-            const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1lllrtaddq';
-
             try {
+                const quoteData = {
+                    clientName: document.getElementById('clientName').value,
+                    region: document.getElementById('region').value,
+                    city: document.getElementById('city').value,
+                    neighborhood: document.getElementById('neighborhood').value,
+                    serviceType: document.getElementById('serviceType').value,
+                    plan: document.getElementById('plan').value,
+                    numChildren: parseInt(document.getElementById('children').value) || 1,
+                    childrenAge: document.getElementById('childrenAge').value,
+                    numProfessionals: parseInt(document.getElementById('professionals').value) || 1,
+                    observations: document.getElementById('observations').value,
+                    validity: document.getElementById('validity').value,
+                    contractDuration: document.getElementById('contract-duration').value,
+                    startDate: document.getElementById('start-date').value
+                };
+
+                const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
+                if (!prices) {
+                    throw new Error('Tabela de preços não encontrada. Verifique os dados no Airtable.');
+                }
+                
+                let totalHours = 0, totalNightHours = 0, totalSundayHours = 0;
+                let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
+
+                if (quoteData.plan === 'Esporádico') {
+                    const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
+                    let totalMinutes = 0, serviceDays = 0;
+                    const datesArray = [];
+                    
+                    dateEntries.forEach(entry => {
+                        const dateVal = entry.querySelector('.sporadic-date').value, startVal = entry.querySelector('.sporadic-start-time').value, endVal = entry.querySelector('.sporadic-end-time').value;
+                        if (dateVal && startVal && endVal) {
+                            serviceDays++;
+                            const start = new Date(`${dateVal}T${startVal}`);
+                            let end = new Date(`${dateVal}T${endVal}`);
+                            if (end < start) end.setDate(end.getDate() + 1);
+                            const durationMillis = end - start;
+                            const durationHours = durationMillis / (1000 * 60 * 60);
+                            totalMinutes += durationMillis / (1000 * 60);
+                            totalHours += durationHours;
+                            totalNightHours += calculateNightHours(start, end);
+                            if (start.getDay() === 0) totalSundayHours += durationHours;
+                            datesArray.push({date: dateVal, start: startVal, end: endVal, duration: durationHours});
+                        }
+                    });
+                    const totalCalcHours = Math.floor(totalMinutes / 60);
+                    const totalCalcMins = Math.round(totalMinutes % 60);
+                    conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
+                    serviceDatesText = `sendo dias ${datesArray.map(d => new Date(d.date+'T00:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})).join(', ')}.`;
+                    if(datesArray.length > 0) {
+                        const firstDate = datesArray[0];
+                        const durationH = Math.floor(firstDate.duration);
+                        const durationM = Math.round((firstDate.duration % 1) * 60);
+                        servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia)`;
+                    }
+                } else { // Mensal
+                    const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
+                    const hasBreak = document.getElementById('break').checked;
+                    const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
+                    const numDaysPerWeek = selectedDays.length;
+                    if (startTime && endTime && numDaysPerWeek > 0 && quoteData.startDate) {
+                        const start = new Date(`1970-01-01T${startTime}`);
+                        let end = new Date(`1970-01-01T${endTime}`);
+                        if (end < start) end.setDate(end.getDate() + 1);
+                        let dailyHours = (end - start) / (1000 * 60 * 60);
+                        if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
+                        const dailyNightHours = calculateNightHours(start, end);
+                        const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
+                        totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
+                        totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
+                        let includesWeekend = false;
+                        selectedDays.forEach(day => { if (day.value === '0') {
+                            totalSundayHours += dailyHours * 4.2;
+                            includesWeekend = true;
+                        }});
+                        const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
+                        const startDate = new Date(quoteData.startDate + '-02T00:00:00');
+                        const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' });
+                        const startYear = startDate.getFullYear();
+                        conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
+                        serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
+                        const durationH = Math.floor(dailyHours);
+                        const durationM = Math.round((dailyHours % 1) * 60);
+                        servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
+                    } else if (!quoteData.startDate) {
+                        throw new Error("Por favor, selecione o Mês/Ano de Início para o plano mensal.");
+                    }
+                }
+                
+                const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
+                let baseCost = totalHours * prices.base;
+                let nightCost = totalNightHours * prices.night;
+                let sundayCost = totalSundayHours * prices.sunday;
+                let childCost = (quoteData.numChildren > 1) ? totalHours * prices.child * (quoteData.numChildren - 1) : 0;
+                
+                baseCost *= quoteData.numProfessionals;
+                nightCost *= quoteData.numProfessionals;
+                sundayCost *= quoteData.numProfessionals;
+                childCost *= quoteData.numProfessionals;
+
+                const subtotal = baseCost + nightCost + sundayCost + childCost;
+                const hasEmergencyAddon = document.getElementById('emergency-addon-checkbox').checked;
+                let emergencyAddonValue = hasEmergencyAddon ? subtotal * 0.20 : 0;
+                const discountValue = parseFloat(document.getElementById('discount-value').value) || 0;
+                const valueBeforeDiscount = subtotal + emergencyAddonValue;
+                let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
+                const totalCost = valueBeforeDiscount - totalDiscount;
+
+                const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1llrtaddq';
+
                 const finalPayload = { ...quoteData, totalCost: totalCost.toFixed(2), baseCost: baseCost.toFixed(2), nightCost: nightCost.toFixed(2), sundayCost: sundayCost.toFixed(2), childCost: childCost.toFixed(2), emergencyAddon: emergencyAddonValue.toFixed(2), totalDiscount: totalDiscount.toFixed(2), discountPercent, conditionsText, serviceDatesText, servicePeriodText };
                 const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalPayload) });
+                
                 if (response.ok) {
                     alert('Orçamento enviado com sucesso! O PDF será gerado em instantes no seu Google Drive.');
                     mainBtn.textContent = 'Orçamento Enviado!';
                     setTimeout(() => { mainBtn.disabled = false; mainBtn.textContent = 'Enviar para Automação'; }, 3000);
-                } else { throw new Error('A automação retornou um erro.'); }
+                } else { 
+                    throw new Error('A automação retornou um erro.'); 
+                }
+
             } catch (error) {
                 console.error(error);
-                alert('Ocorreu um erro ao enviar o orçamento para automação.');
+                alert(`Ocorreu um erro: ${error.message}`);
                 mainBtn.disabled = false;
                 mainBtn.textContent = 'Tentar Novamente';
             }

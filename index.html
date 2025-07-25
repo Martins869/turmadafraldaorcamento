@@ -379,33 +379,32 @@
                     const hasBreak = document.getElementById('break').checked;
                     const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
                     const numDaysPerWeek = selectedDays.length;
-                    if (startTime && endTime && numDaysPerWeek > 0 && quoteData.startDate) {
-                        const start = new Date(`1970-01-01T${startTime}`);
-                        let end = new Date(`1970-01-01T${endTime}`);
-                        if (end < start) end.setDate(end.getDate() + 1);
-                        let dailyHours = (end - start) / (1000 * 60 * 60);
-                        if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
-                        const dailyNightHours = calculateNightHours(start, end);
-                        const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
-                        totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
-                        totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
-                        let includesWeekend = false;
-                        selectedDays.forEach(day => { if (day.value === '0') {
-                            totalSundayHours += dailyHours * 4.2;
-                            includesWeekend = true;
-                        }});
-                        const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
-                        const startDate = new Date(quoteData.startDate + '-02T00:00:00');
-                        const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' });
-                        const startYear = startDate.getFullYear();
-                        conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
-                        serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
-                        const durationH = Math.floor(dailyHours);
-                        const durationM = Math.round((dailyHours % 1) * 60);
-                        servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
-                    } else if (!quoteData.startDate) {
-                        throw new Error("Por favor, selecione o Mês/Ano de Início para o plano mensal.");
+                    if (!quoteData.startDate || !startTime || !endTime || numDaysPerWeek === 0) {
+                         throw new Error("Para o plano mensal, por favor, preencha a Duração, Mês/Ano de Início, Dias da Semana e Horários.");
                     }
+                    const start = new Date(`1970-01-01T${startTime}`);
+                    let end = new Date(`1970-01-01T${endTime}`);
+                    if (end < start) end.setDate(end.getDate() + 1);
+                    let dailyHours = (end - start) / (1000 * 60 * 60);
+                    if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
+                    const dailyNightHours = calculateNightHours(start, end);
+                    const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
+                    totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
+                    totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
+                    let includesWeekend = false;
+                    selectedDays.forEach(day => { if (day.value === '0') {
+                        totalSundayHours += dailyHours * 4.2;
+                        includesWeekend = true;
+                    }});
+                    const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
+                    const startDate = new Date(quoteData.startDate + '-02T00:00:00');
+                    const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' });
+                    const startYear = startDate.getFullYear();
+                    conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
+                    serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
+                    const durationH = Math.floor(dailyHours);
+                    const durationM = Math.round((dailyHours % 1) * 60);
+                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
                 }
                 
                 const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
@@ -427,7 +426,10 @@
                 let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
                 const totalCost = valueBeforeDiscount - totalDiscount;
 
-                const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1llrtaddq';
+                // ==================================================================
+                // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
+                // ==================================================================
+                const WEBHOOK_URL = 'COLE_A_URL_DO_SEU_WEBHOOK_AQUI';
 
                 const finalPayload = { ...quoteData, totalCost: totalCost.toFixed(2), baseCost: baseCost.toFixed(2), nightCost: nightCost.toFixed(2), sundayCost: sundayCost.toFixed(2), childCost: childCost.toFixed(2), emergencyAddon: emergencyAddonValue.toFixed(2), totalDiscount: totalDiscount.toFixed(2), discountPercent, conditionsText, serviceDatesText, servicePeriodText };
                 const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalPayload) });

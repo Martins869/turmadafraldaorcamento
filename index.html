@@ -62,6 +62,7 @@
 <body class="p-4 sm:p-6 md:p-8">
 
     <div class="max-w-4xl mx-auto">
+        <!-- Cabeçalho -->
         <header class="text-center mb-8">
             <div class="inline-flex items-center gap-4">
                  <div class="flex">
@@ -73,6 +74,7 @@
         </header>
 
         <main id="mainForm">
+            <!-- Seção de Dados do Cliente -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">1. Dados do Cliente e Negócio</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -102,6 +104,7 @@
                 </div>
             </section>
 
+            <!-- Seção de Serviço e Plano -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">2. Serviço e Plano</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -123,8 +126,10 @@
                 </div>
             </section>
 
+            <!-- Seção de Configuração de Dias e Horários -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">3. Dias e Horários</h2>
+                <!-- Campos para Plano Mensal -->
                 <div id="monthly-fields" class="hidden">
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
@@ -164,6 +169,7 @@
                     </div>
                 </div>
 
+                <!-- Campos para Plano Esporádico -->
                 <div id="sporadic-fields">
                     <div id="sporadic-dates-container">
                     </div>
@@ -171,6 +177,7 @@
                 </div>
             </section>
             
+            <!-- Seção de Detalhes Adicionais -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">4. Detalhes Adicionais</h2>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -193,7 +200,8 @@
                 </div>
             </section>
 
-            <section class="form-section">
+            <!-- Seção de Descontos e Observações -->
+             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">5. Descontos, Adicionais e Observações</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -217,6 +225,7 @@
                 </div>
             </section>
 
+            <!-- Botão de Ação Principal -->
             <div class="text-center mt-8">
                 <button type="button" id="main-action-btn" class="btn-primary text-lg">Enviar para Automação</button>
             </div>
@@ -424,7 +433,7 @@
                 // ==================================================================
                 // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
                 // ==================================================================
-                const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1lllrtaddq';
+                const WEBHOOK_URL = 'COLE_A_URL_DO_SEU_WEBHOOK_AQUI';
 
                 const finalPayload = { ...quoteData, totalCost: totalCost.toFixed(2), baseCost: baseCost.toFixed(2), nightCost: nightCost.toFixed(2), sundayCost: sundayCost.toFixed(2), childCost: childCost.toFixed(2), emergencyAddon: emergencyAddonValue.toFixed(2), totalDiscount: totalDiscount.toFixed(2), discountPercent, conditionsText, serviceDatesText, servicePeriodText };
                 const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalPayload) });

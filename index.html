@@ -79,12 +79,12 @@
                 <h2 class="text-xl font-bold mb-4 text-slate-700">1. Dados do Cliente e Negócio</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                        <label for="kommoLeadId" class="block mb-1 font-medium text-slate-600">ID do Negócio no Kommo</label>
+                        <input type="number" id="kommoLeadId" class="form-input" placeholder="Cole aqui o ID do negócio">
+                    </div>
+                    <div>
                         <label for="clientName" class="block mb-1 font-medium text-slate-600">Nome Completo do Cliente</label>
                         <input type="text" id="clientName" class="form-input" placeholder="Ex: Thaísa Cristina Maranhão Martins">
-                    </div>
-                     <div>
-                        <label for="phoneNumber" class="block mb-1 font-medium text-slate-600">Telefone do Cliente (com DDI/DDD)</label>
-                        <input type="tel" id="phoneNumber" class="form-input" placeholder="Ex: 5513999998888">
                     </div>
                     <div>
                         <label for="region" class="block mb-1 font-medium text-slate-600">Região de Atendimento</label>
@@ -163,10 +163,6 @@
                             <input type="time" id="monthly-end-time" class="form-input">
                         </div>
                     </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" id="break" class="mr-2">
-                        <label for="break">Pausa de 1 hora para intervalo</label>
-                    </div>
                 </div>
 
                 <!-- Campos para Plano Esporádico -->
@@ -174,6 +170,16 @@
                     <div id="sporadic-dates-container">
                     </div>
                     <button type="button" id="add-sporadic-date" class="btn-secondary mt-2">Adicionar Data</button>
+                </div>
+
+                <!-- Opção de Intervalo (para ambos os planos) -->
+                <div class="mt-4 border-t pt-4">
+                    <label for="break-option" class="block mb-1 font-medium text-slate-600">Intervalo da Profissional</label>
+                    <select id="break-option" class="form-input">
+                        <option value="0">Sem intervalo</option>
+                        <option value="15">15 minutos de intervalo</option>
+                        <option value="60">1 hora de intervalo</option>
+                    </select>
                 </div>
             </section>
             
@@ -319,7 +325,7 @@
 
             try {
                 const quoteData = {
-                    phoneNumber: document.getElementById('phoneNumber').value,
+                    kommoLeadId: document.getElementById('kommoLeadId').value,
                     clientName: document.getElementById('clientName').value,
                     region: document.getElementById('region').value,
                     city: document.getElementById('city').value,
@@ -332,11 +338,12 @@
                     observations: document.getElementById('observations').value,
                     validity: document.getElementById('validity').value,
                     contractDuration: document.getElementById('contract-duration').value,
-                    startDate: document.getElementById('start-date').value
+                    startDate: document.getElementById('start-date').value,
+                    breakMinutes: parseInt(document.getElementById('break-option').value, 10)
                 };
                 
-                if(!quoteData.phoneNumber) {
-                    throw new Error("Por favor, insira o Telefone do Cliente.");
+                if(!quoteData.kommoLeadId) {
+                    throw new Error("Por favor, insira o ID do Negócio no Kommo.");
                 }
 
                 const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
@@ -346,6 +353,11 @@
                 
                 let totalHours = 0, totalNightHours = 0, totalSundayHours = 0;
                 let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
+                
+                const breakHours = quoteData.breakMinutes / 60;
+                let breakText = "";
+                if (quoteData.breakMinutes === 15) breakText = ", com 15min de intervalo";
+                if (quoteData.breakMinutes === 60) breakText = ", com 1h de intervalo";
 
                 if (quoteData.plan === 'Esporádico') {
                     const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
@@ -359,13 +371,15 @@
                             const start = new Date(`${dateVal}T${startVal}`);
                             let end = new Date(`${dateVal}T${endVal}`);
                             if (end < start) end.setDate(end.getDate() + 1);
-                            const durationMillis = end - start;
-                            const durationHours = durationMillis / (1000 * 60 * 60);
-                            totalMinutes += durationMillis / (1000 * 60);
+                            
+                            let displayHours = (end - start) / (1000 * 60 * 60);
+                            let durationHours = Math.max(0, displayHours - breakHours);
+
+                            totalMinutes += durationHours * 60;
                             totalHours += durationHours;
                             totalNightHours += calculateNightHours(start, end);
                             if (start.getDay() === 0) totalSundayHours += durationHours;
-                            datesArray.push({date: dateVal, start: startVal, end: endVal, duration: durationHours});
+                            datesArray.push({date: dateVal, start: startVal, end: endVal, duration: displayHours});
                         }
                     });
                     const totalCalcHours = Math.floor(totalMinutes / 60);
@@ -376,11 +390,10 @@
                         const firstDate = datesArray[0];
                         const durationH = Math.floor(firstDate.duration);
                         const durationM = Math.round((firstDate.duration % 1) * 60);
-                        servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia)`;
+                        servicePeriodText = `das ${firstDate.start || ''} às ${firstDate.end || ''} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia${breakText})`;
                     }
                 } else { // Mensal
                     const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
-                    const hasBreak = document.getElementById('break').checked;
                     const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
                     const numDaysPerWeek = selectedDays.length;
                     if (!quoteData.startDate || !startTime || !endTime || numDaysPerWeek === 0) {
@@ -389,8 +402,10 @@
                     const start = new Date(`1970-01-01T${startTime}`);
                     let end = new Date(`1970-01-01T${endTime}`);
                     if (end < start) end.setDate(end.getDate() + 1);
-                    let dailyHours = (end - start) / (1000 * 60 * 60);
-                    if (hasBreak) dailyHours = Math.max(0, dailyHours - 1);
+                    
+                    let displayHours = (end - start) / (1000 * 60 * 60);
+                    let dailyHours = Math.max(0, displayHours - breakHours);
+
                     const dailyNightHours = calculateNightHours(start, end);
                     const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
                     totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
@@ -406,9 +421,9 @@
                     const startYear = startDate.getFullYear();
                     conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
                     serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
-                    const durationH = Math.floor(dailyHours);
-                    const durationM = Math.round((dailyHours % 1) * 60);
-                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia).`;
+                    const durationH = Math.floor(displayHours);
+                    const durationM = Math.round((displayHours % 1) * 60);
+                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia${breakText}).`;
                 }
                 
                 const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;

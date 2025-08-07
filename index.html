@@ -130,9 +130,10 @@
             <!-- Seção de Configuração de Dias e Horários -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">3. Dias e Horários</h2>
-                <!-- Campos para Plano Mensal e Esporádico Fixo -->
-                <div id="fixed-schedule-fields" class="hidden">
-                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                
+                <!-- Campos para Planos Fixos (Mensal e Esporádico Fixo) -->
+                <div id="fixed-schedule-fields" class="hidden space-y-4">
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="contract-duration" class="block mb-1 font-medium text-slate-600">Duração do Contrato (meses)</label>
                             <input type="number" id="contract-duration" class="form-input" value="1" min="1">
@@ -142,43 +143,15 @@
                             <input type="month" id="start-date" class="form-input">
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                         <div>
-                            <label class="block mb-1 font-medium text-slate-600">Dias da Semana</label>
-                            <div id="monthly-days-checkboxes" class="flex flex-wrap gap-x-4 gap-y-2">
-                                <label class="flex items-center"><input type="checkbox" value="1" class="mr-2">Seg</label>
-                                <label class="flex items-center"><input type="checkbox" value="2" class="mr-2">Ter</label>
-                                <label class="flex items-center"><input type="checkbox" value="3" class="mr-2">Qua</label>
-                                <label class="flex items-center"><input type="checkbox" value="4" class="mr-2">Qui</label>
-                                <label class="flex items-center"><input type="checkbox" value="5" class="mr-2">Sex</label>
-                                <label class="flex items-center"><input type="checkbox" value="6" class="mr-2">Sáb</label>
-                                <label class="flex items-center"><input type="checkbox" value="0" class="mr-2">Dom</label>
-                            </div>
-                        </div>
-                        <div>
-                            <label for="monthly-start-time" class="block mb-1 font-medium text-slate-600">Horário de Entrada</label>
-                            <input type="time" id="monthly-start-time" class="form-input">
-                        </div>
-                        <div>
-                            <label for="monthly-end-time" class="block mb-1 font-medium text-slate-600">Horário de Saída</label>
-                            <input type="time" id="monthly-end-time" class="form-input">
-                        </div>
+                    <div id="fixed-blocks-container">
+                        <!-- Blocos de horário fixo serão adicionados aqui -->
                     </div>
-                     <!-- Opção de Intervalo (Apenas para planos fixos) -->
-                    <div id="monthly-break-section" class="mt-4 border-t pt-4">
-                        <label for="monthly-break-option" class="block mb-1 font-medium text-slate-600">Intervalo da Profissional</label>
-                        <select id="monthly-break-option" class="form-input">
-                            <option value="0">Sem intervalo</option>
-                            <option value="15">15 minutos de intervalo</option>
-                            <option value="60">1 hora de intervalo</option>
-                        </select>
-                    </div>
+                    <button type="button" id="add-fixed-block" class="btn-secondary">Adicionar Bloco de Horário Fixo</button>
                 </div>
 
                 <!-- Campos para Plano Esporádico -->
                 <div id="sporadic-fields">
-                    <div id="sporadic-dates-container" class="space-y-4">
-                    </div>
+                    <div id="sporadic-dates-container" class="space-y-4"></div>
                     <button type="button" id="add-sporadic-date" class="btn-secondary mt-4">Adicionar Data</button>
                 </div>
             </section>
@@ -241,6 +214,7 @@
     <script>
         let priceTable = {};
         let sporadicDateCount = 0;
+        let fixedBlockCount = 0;
 
         async function fetchPriceTable() {
             const mainBtn = document.getElementById('main-action-btn');
@@ -279,16 +253,27 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchPriceTable();
             const planSelect = document.getElementById('plan');
-            planSelect.addEventListener('change', () => {
-                const planValue = planSelect.value;
-                const isFixed = planValue === 'Mensal fixo' || planValue === 'Esporádico fixo';
-                document.getElementById('fixed-schedule-fields').classList.toggle('hidden', !isFixed);
-                document.getElementById('sporadic-fields').classList.toggle('hidden', isFixed);
-            });
+            planSelect.addEventListener('change', handlePlanChange);
             document.getElementById('add-sporadic-date').addEventListener('click', addSporadicDate);
+            document.getElementById('add-fixed-block').addEventListener('click', addFixedBlock);
             document.getElementById('main-action-btn').addEventListener('click', submitQuote);
-            addSporadicDate();
+            
+            handlePlanChange(); // Initialize view based on default plan
         });
+        
+        function handlePlanChange() {
+            const planValue = document.getElementById('plan').value;
+            const isFixed = planValue === 'Mensal fixo' || planValue === 'Esporádico fixo';
+            document.getElementById('fixed-schedule-fields').classList.toggle('hidden', !isFixed);
+            document.getElementById('sporadic-fields').classList.toggle('hidden', planValue !== 'Esporádico');
+            
+            if (isFixed && fixedBlockCount === 0) {
+                addFixedBlock();
+            }
+            if (planValue === 'Esporádico' && sporadicDateCount === 0) {
+                addSporadicDate();
+            }
+        }
 
         function addSporadicDate() {
             sporadicDateCount++;
@@ -300,13 +285,44 @@
                 <div><label class="block mb-1 text-sm font-medium text-slate-500">Entrada</label><input type="time" class="form-input sporadic-start-time"></div>
                 <div><label class="block mb-1 text-sm font-medium text-slate-500">Saída</label><input type="time" class="form-input sporadic-end-time"></div>
                 <div><label class="block mb-1 text-sm font-medium text-slate-500">Intervalo</label><select class="form-input sporadic-break">
-                    <option value="0">Sem intervalo</option>
-                    <option value="15">15 min</option>
-                    <option value="60">1 hora</option>
+                    <option value="0">Sem intervalo</option><option value="15">15 min</option><option value="60">1 hora</option>
                 </select></div>
                 <div class="mt-6"><label class="flex items-center"><input type="checkbox" class="form-checkbox sporadic-holiday mr-2"> Feriado</label></div>
             `;
             container.appendChild(newDateEntry);
+        }
+
+        function addFixedBlock() {
+            fixedBlockCount++;
+            const container = document.getElementById('fixed-blocks-container');
+            const newBlock = document.createElement('div');
+            newBlock.className = 'p-4 border rounded-lg space-y-4 mb-4';
+            newBlock.innerHTML = `
+                <h4 class="font-semibold text-slate-600">Bloco de Horário ${fixedBlockCount}</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block mb-1 font-medium text-slate-600">Dias da Semana</label>
+                        <div class="flex flex-wrap gap-x-4 gap-y-2 fixed-days-checkboxes">
+                            <label class="flex items-center"><input type="checkbox" value="1" class="mr-2">Seg</label>
+                            <label class="flex items-center"><input type="checkbox" value="2" class="mr-2">Ter</label>
+                            <label class="flex items-center"><input type="checkbox" value="3" class="mr-2">Qua</label>
+                            <label class="flex items-center"><input type="checkbox" value="4" class="mr-2">Qui</label>
+                            <label class="flex items-center"><input type="checkbox" value="5" class="mr-2">Sex</label>
+                            <label class="flex items-center"><input type="checkbox" value="6" class="mr-2">Sáb</label>
+                            <label class="flex items-center"><input type="checkbox" value="0" class="mr-2">Dom</label>
+                        </div>
+                    </div>
+                    <div><label class="block mb-1 font-medium text-slate-600">Horário de Entrada</label><input type="time" class="form-input fixed-start-time"></div>
+                    <div><label class="block mb-1 font-medium text-slate-600">Horário de Saída</label><input type="time" class="form-input fixed-end-time"></div>
+                </div>
+                <div>
+                    <label class="block mb-1 font-medium text-slate-600">Intervalo</label>
+                    <select class="form-input fixed-break-option">
+                        <option value="0">Sem intervalo</option><option value="15">15 minutos</option><option value="60">1 hora</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(newBlock);
         }
 
         function calculateNightHours(start, end) {
@@ -348,46 +364,42 @@
                     startDate: document.getElementById('start-date').value,
                 };
                 
-                if(!quoteData.phoneNumber) {
-                    throw new Error("Por favor, insira o Telefone do Cliente.");
-                }
+                if(!quoteData.phoneNumber) throw new Error("Por favor, insira o Telefone do Cliente.");
 
                 const prices = priceTable[quoteData.region]?.[quoteData.serviceType]?.[quoteData.plan];
-                if (!prices) {
-                    throw new Error('Tabela de preços não encontrada. Verifique os dados no Airtable.');
-                }
+                if (!prices) throw new Error('Tabela de preços não encontrada. Verifique os dados no Airtable.');
                 
                 let totalHours = 0, totalNightHours = 0, totalSundayHolidayHours = 0;
                 let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
+                let totalServiceDays = 0;
+                let totalBilledMinutes = 0;
 
+                // --- Cálculo para a parte esporádica ---
                 if (quoteData.plan === 'Esporádico') {
                     const dateEntries = document.querySelectorAll('#sporadic-dates-container > div');
-                    let totalMinutes = 0, serviceDays = 0;
                     const datesArray = [];
-                    
                     dateEntries.forEach(entry => {
                         const dateVal = entry.querySelector('.sporadic-date').value, startVal = entry.querySelector('.sporadic-start-time').value, endVal = entry.querySelector('.sporadic-end-time').value;
                         const breakMinutes = parseInt(entry.querySelector('.sporadic-break').value, 10);
                         const isHoliday = entry.querySelector('.sporadic-holiday').checked;
                         if (dateVal && startVal && endVal) {
-                            serviceDays++;
+                            totalServiceDays++;
                             const start = new Date(`${dateVal}T${startVal}`);
                             let end = new Date(`${dateVal}T${endVal}`);
                             if (end < start) end.setDate(end.getDate() + 1);
                             
                             let displayHours = (end - start) / (1000 * 60 * 60);
+                            let billedHours = Math.max(displayHours, 4); // Regra do mínimo de 4 horas
                             let durationHours = Math.max(0, displayHours - (breakMinutes / 60));
 
-                            totalMinutes += durationHours * 60;
+                            totalBilledMinutes += billedHours * 60;
                             totalHours += durationHours;
                             totalNightHours += calculateNightHours(start, end);
-                            if (start.getDay() === 0 || isHoliday) {
-                                totalSundayHolidayHours += durationHours;
-                            }
+                            if (start.getDay() === 0 || isHoliday) totalSundayHolidayHours += durationHours;
                             datesArray.push({date: new Date(dateVal+'T00:00:00'), start: startVal, end: endVal, duration: displayHours, breakMinutes});
                         }
                     });
-                    
+                     // Lógica de texto para esporádico
                     const datesByMonth = datesArray.reduce((acc, curr) => {
                         const monthYear = curr.date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
                         if (!acc[monthYear]) acc[monthYear] = [];
@@ -412,46 +424,61 @@
                         return `${timeKey} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia) nos dias ${dayList}`;
                     }).join(';\n');
 
-                    const totalCalcHours = Math.floor(totalMinutes / 60);
-                    const totalCalcMins = Math.round(totalMinutes % 60);
-                    conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
+                    const totalCalcHours = Math.floor(totalBilledMinutes / 60);
+                    const totalCalcMins = Math.round(totalBilledMinutes % 60);
+                    conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${totalServiceDays} dia(s) de atendimento).`;
+                }
 
-                } else { // Mensal e Esporádico Fixo
-                    const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
-                    const breakMinutes = parseInt(document.getElementById('monthly-break-option').value, 10);
-                    const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
-                    const numDaysPerWeek = selectedDays.length;
-                    if (!quoteData.startDate || !startTime || !endTime || numDaysPerWeek === 0) {
-                         throw new Error("Para planos com dias fixos, por favor, preencha a Duração, Mês/Ano de Início, Dias da Semana e Horários.");
-                    }
-                    const start = new Date(`1970-01-01T${startTime}`);
-                    let end = new Date(`1970-01-01T${endTime}`);
-                    if (end < start) end.setDate(end.getDate() + 1);
+                // --- Cálculo para planos fixos ---
+                if (quoteData.plan === 'Mensal fixo' || quoteData.plan === 'Esporádico fixo') {
+                    const fixedBlocks = document.querySelectorAll('#fixed-blocks-container > div');
+                    let fixedServiceText = [];
+                    let fixedPeriodText = [];
+
+                    fixedBlocks.forEach(block => {
+                        const startTime = block.querySelector('.fixed-start-time').value, endTime = block.querySelector('.fixed-end-time').value;
+                        const breakMinutes = parseInt(block.querySelector('.fixed-break-option').value, 10);
+                        const selectedDays = Array.from(block.querySelectorAll('.fixed-days-checkboxes input:checked'));
+                        const numDaysPerWeek = selectedDays.length;
+
+                        if (startTime && endTime && numDaysPerWeek > 0) {
+                            const start = new Date(`1970-01-01T${startTime}`);
+                            let end = new Date(`1970-01-01T${endTime}`);
+                            if (end < start) end.setDate(end.getDate() + 1);
+                            
+                            let displayHours = (end - start) / (1000 * 60 * 60);
+                            let billedHours = Math.max(displayHours, 4); // Regra do mínimo de 4 horas
+                            let dailyHours = Math.max(0, displayHours - (breakMinutes / 60));
+                            
+                            const dailyNightHours = calculateNightHours(start, end);
+                            const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
+                            totalHours += dailyHours * numDaysPerWeek * weeklyFactor;
+                            totalNightHours += dailyNightHours * numDaysPerWeek * weeklyFactor;
+                            
+                            let includesWeekend = false;
+                            selectedDays.forEach(day => { if (day.value === '0') {
+                                totalSundayHolidayHours += dailyHours * 4.2;
+                                includesWeekend = true;
+                            }});
+                            
+                            const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
+                            fixedServiceText.push(`Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}`);
+                            
+                            let breakText = "";
+                            if (breakMinutes === 15) breakText = ", com 15min de intervalo";
+                            if (breakMinutes === 60) breakText = ", com 1h de intervalo";
+                            const durationH = Math.floor(displayHours);
+                            const durationM = Math.round((displayHours % 1) * 60);
+                            fixedPeriodText.push(`Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia${breakText})`);
+                        }
+                    });
                     
-                    let displayHours = (end - start) / (1000 * 60 * 60);
-                    let dailyHours = Math.max(0, displayHours - (breakMinutes / 60));
-                    let breakText = "";
-                    if (breakMinutes === 15) breakText = ", com 15min de intervalo";
-                    if (breakMinutes === 60) breakText = ", com 1h de intervalo";
-
-                    const dailyNightHours = calculateNightHours(start, end);
-                    const weeklyFactor = numDaysPerWeek <= 5 ? 4.4 : 4.2;
-                    totalHours = dailyHours * numDaysPerWeek * weeklyFactor;
-                    totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
-                    let includesWeekend = false;
-                    selectedDays.forEach(day => { if (day.value === '0') {
-                        totalSundayHolidayHours += dailyHours * 4.2;
-                        includesWeekend = true;
-                    }});
-                    const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
                     const startDate = new Date(quoteData.startDate + '-02T00:00:00');
                     const startMonth = startDate.toLocaleString('pt-BR', { month: 'long' });
                     const startYear = startDate.getFullYear();
                     conditionsText = `Contrato para ${quoteData.contractDuration} meses de atendimento, início ${startMonth}/${startYear}.`;
-                    serviceDatesText = `Atendimento de ${selectedDays.map(d => dayNames[d.value]).join(', ')}. ${includesWeekend ? '' : 'Apenas dias úteis.'}`;
-                    const durationH = Math.floor(displayHours);
-                    const durationM = Math.round((displayHours % 1) * 60);
-                    servicePeriodText = `Das ${startTime} às ${endTime} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia${breakText}).`;
+                    serviceDatesText = fixedServiceText.join('; ');
+                    servicePeriodText = fixedPeriodText.join('; ');
                 }
                 
                 const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
@@ -473,10 +500,7 @@
                 let totalDiscount = (valueBeforeDiscount * (discountPercent / 100)) + discountValue;
                 const totalCost = valueBeforeDiscount - totalDiscount;
 
-                // ==================================================================
-                // ATENÇÃO: SUBSTITUA PELA SUA URL REAL DO WEBHOOK DO MAKE.COM
-                // ==================================================================
-                const WEBHOOK_URL = 'https://hook.eu2.make.com/l8m0jixritokjk8bxo2flv1lllrtaddq';
+                const WEBHOOK_URL = 'COLE_A_URL_DO_SEU_WEBHOOK_AQUI';
 
                 const finalPayload = { ...quoteData, totalCost: totalCost.toFixed(2), baseCost: baseCost.toFixed(2), nightCost: nightCost.toFixed(2), sundayCost: sundayCost.toFixed(2), childCost: childCost.toFixed(2), emergencyAddon: emergencyAddonValue.toFixed(2), totalDiscount: totalDiscount.toFixed(2), discountPercent, conditionsText, serviceDatesText, servicePeriodText };
                 const response = await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(finalPayload) });

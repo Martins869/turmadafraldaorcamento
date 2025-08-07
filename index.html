@@ -389,7 +389,7 @@
                         acc[monthYear].push(curr.date.getDate());
                         return acc;
                     }, {});
-                    serviceDatesText = "sendo " + Object.entries(datesByMonth).map(([monthYear, days]) => `dias ${days.sort((a, b) => a - b).join(', ')} de ${monthYear}`).join('; ');
+                    serviceDatesText = "sendo " + Object.entries(datesByMonth).map(([monthYear, days]) => `dias ${days.sort((a, b) => a - b).join(', ')} de ${monthYear}`).join(';\n');
 
                     // Lógica de agrupamento de períodos
                     const periodsByTime = datesArray.reduce((acc, curr) => {
@@ -406,7 +406,7 @@
                         const durationH = Math.floor(firstEntry.duration);
                         const durationM = Math.round((firstEntry.duration % 1) * 60);
                         return `${timeKey} (${durationH}h${durationM > 0 ? durationM+'min' : ''} por dia) nos dias ${dayList}`;
-                    }).join('; ');
+                    }).join(';\n');
 
                     const totalCalcHours = Math.floor(totalMinutes / 60);
                     const totalCalcMins = Math.round(totalMinutes % 60);

@@ -292,7 +292,7 @@
             sporadicDateCount++;
             const container = document.getElementById('sporadic-dates-container');
             const newDateEntry = document.createElement('div');
-            newDateEntry.className = 'grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg';
+            newDateEntry.className = 'grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg items-center';
             newDateEntry.innerHTML = `
                 <div><label class="block mb-1 text-sm font-medium text-slate-500">Data ${sporadicDateCount}</label><input type="date" class="form-input sporadic-date"></div>
                 <div><label class="block mb-1 text-sm font-medium text-slate-500">Entrada</label><input type="time" class="form-input sporadic-start-time"></div>
@@ -302,6 +302,7 @@
                     <option value="15">15 min</option>
                     <option value="60">1 hora</option>
                 </select></div>
+                <div class="mt-6"><label class="flex items-center"><input type="checkbox" class="form-checkbox sporadic-holiday mr-2"> Feriado</label></div>
             `;
             container.appendChild(newDateEntry);
         }
@@ -354,7 +355,7 @@
                     throw new Error('Tabela de preços não encontrada. Verifique os dados no Airtable.');
                 }
                 
-                let totalHours = 0, totalNightHours = 0, totalSundayHours = 0;
+                let totalHours = 0, totalNightHours = 0, totalSundayHolidayHours = 0;
                 let conditionsText = "", serviceDatesText = "", servicePeriodText = "";
 
                 if (quoteData.plan === 'Esporádico') {
@@ -365,6 +366,7 @@
                     dateEntries.forEach(entry => {
                         const dateVal = entry.querySelector('.sporadic-date').value, startVal = entry.querySelector('.sporadic-start-time').value, endVal = entry.querySelector('.sporadic-end-time').value;
                         const breakMinutes = parseInt(entry.querySelector('.sporadic-break').value, 10);
+                        const isHoliday = entry.querySelector('.sporadic-holiday').checked;
                         if (dateVal && startVal && endVal) {
                             serviceDays++;
                             const start = new Date(`${dateVal}T${startVal}`);
@@ -377,12 +379,13 @@
                             totalMinutes += durationHours * 60;
                             totalHours += durationHours;
                             totalNightHours += calculateNightHours(start, end);
-                            if (start.getDay() === 0) totalSundayHours += durationHours;
+                            if (start.getDay() === 0 || isHoliday) {
+                                totalSundayHolidayHours += durationHours;
+                            }
                             datesArray.push({date: new Date(dateVal+'T00:00:00'), start: startVal, end: endVal, duration: displayHours, breakMinutes});
                         }
                     });
                     
-                    // Lógica de agrupamento de datas
                     const datesByMonth = datesArray.reduce((acc, curr) => {
                         const monthYear = curr.date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
                         if (!acc[monthYear]) acc[monthYear] = [];
@@ -391,7 +394,6 @@
                     }, {});
                     serviceDatesText = "sendo " + Object.entries(datesByMonth).map(([monthYear, days]) => `dias ${days.sort((a, b) => a - b).join(', ')} de ${monthYear}`).join(';\n');
 
-                    // Lógica de agrupamento de períodos
                     const periodsByTime = datesArray.reduce((acc, curr) => {
                         const breakTextMap = {0: "", 15: ", com 15min de intervalo", 60: ", com 1h de intervalo"};
                         const breakInfo = breakTextMap[curr.breakMinutes];
@@ -436,7 +438,7 @@
                     totalNightHours = dailyNightHours * numDaysPerWeek * weeklyFactor;
                     let includesWeekend = false;
                     selectedDays.forEach(day => { if (day.value === '0') {
-                        totalSundayHours += dailyHours * 4.2;
+                        totalSundayHolidayHours += dailyHours * 4.2;
                         includesWeekend = true;
                     }});
                     const dayNames = {0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado'};
@@ -453,7 +455,7 @@
                 const discountPercent = parseFloat(document.getElementById('discount-percent').value) || 0;
                 let baseCost = totalHours * prices.base;
                 let nightCost = totalNightHours * prices.night;
-                let sundayCost = totalSundayHours * prices.sunday;
+                let sundayCost = totalSundayHolidayHours * prices.sunday;
                 let childCost = (quoteData.numChildren > 1) ? totalHours * prices.child * (quoteData.numChildren - 1) : 0;
                 
                 baseCost *= quoteData.numProfessionals;

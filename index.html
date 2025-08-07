@@ -120,6 +120,7 @@
                         <label for="plan" class="block mb-1 font-medium text-slate-600">Plano</label>
                         <select id="plan" class="form-input">
                             <option value="Esporádico">Esporádico</option>
+                            <option value="Esporádico fixo">Esporádico fixo</option>
                             <option value="Mensal fixo">Mensal fixo</option>
                         </select>
                     </div>
@@ -129,8 +130,8 @@
             <!-- Seção de Configuração de Dias e Horários -->
             <section class="form-section">
                 <h2 class="text-xl font-bold mb-4 text-slate-700">3. Dias e Horários</h2>
-                <!-- Campos para Plano Mensal -->
-                <div id="monthly-fields" class="hidden">
+                <!-- Campos para Plano Mensal e Esporádico Fixo -->
+                <div id="fixed-schedule-fields" class="hidden">
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label for="contract-duration" class="block mb-1 font-medium text-slate-600">Duração do Contrato (meses)</label>
@@ -163,7 +164,7 @@
                             <input type="time" id="monthly-end-time" class="form-input">
                         </div>
                     </div>
-                     <!-- Opção de Intervalo (Apenas para Mensal) -->
+                     <!-- Opção de Intervalo (Apenas para planos fixos) -->
                     <div id="monthly-break-section" class="mt-4 border-t pt-4">
                         <label for="monthly-break-option" class="block mb-1 font-medium text-slate-600">Intervalo da Profissional</label>
                         <select id="monthly-break-option" class="form-input">
@@ -279,9 +280,10 @@
             fetchPriceTable();
             const planSelect = document.getElementById('plan');
             planSelect.addEventListener('change', () => {
-                const isMonthly = planSelect.value === 'Mensal fixo';
-                document.getElementById('monthly-fields').classList.toggle('hidden', !isMonthly);
-                document.getElementById('sporadic-fields').classList.toggle('hidden', isMonthly);
+                const planValue = planSelect.value;
+                const isFixed = planValue === 'Mensal fixo' || planValue === 'Esporádico fixo';
+                document.getElementById('fixed-schedule-fields').classList.toggle('hidden', !isFixed);
+                document.getElementById('sporadic-fields').classList.toggle('hidden', isFixed);
             });
             document.getElementById('add-sporadic-date').addEventListener('click', addSporadicDate);
             document.getElementById('main-action-btn').addEventListener('click', submitQuote);
@@ -414,13 +416,13 @@
                     const totalCalcMins = Math.round(totalMinutes % 60);
                     conditionsText = `${totalCalcHours} hora(s) e ${totalCalcMins} minuto(s) (contados para ${serviceDays} dia(s) de atendimento).`;
 
-                } else { // Mensal
+                } else { // Mensal e Esporádico Fixo
                     const startTime = document.getElementById('monthly-start-time').value, endTime = document.getElementById('monthly-end-time').value;
                     const breakMinutes = parseInt(document.getElementById('monthly-break-option').value, 10);
                     const selectedDays = Array.from(document.querySelectorAll('#monthly-days-checkboxes input:checked'));
                     const numDaysPerWeek = selectedDays.length;
                     if (!quoteData.startDate || !startTime || !endTime || numDaysPerWeek === 0) {
-                         throw new Error("Para o plano mensal, por favor, preencha a Duração, Mês/Ano de Início, Dias da Semana e Horários.");
+                         throw new Error("Para planos com dias fixos, por favor, preencha a Duração, Mês/Ano de Início, Dias da Semana e Horários.");
                     }
                     const start = new Date(`1970-01-01T${startTime}`);
                     let end = new Date(`1970-01-01T${endTime}`);

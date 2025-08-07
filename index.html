@@ -382,6 +382,7 @@
                         }
                     });
                     
+                    // Lógica de agrupamento de datas
                     const datesByMonth = datesArray.reduce((acc, curr) => {
                         const monthYear = curr.date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
                         if (!acc[monthYear]) acc[monthYear] = [];
@@ -390,6 +391,7 @@
                     }, {});
                     serviceDatesText = "sendo " + Object.entries(datesByMonth).map(([monthYear, days]) => `dias ${days.sort((a, b) => a - b).join(', ')} de ${monthYear}`).join('; ');
 
+                    // Lógica de agrupamento de períodos
                     const periodsByTime = datesArray.reduce((acc, curr) => {
                         const breakTextMap = {0: "", 15: ", com 15min de intervalo", 60: ", com 1h de intervalo"};
                         const breakInfo = breakTextMap[curr.breakMinutes];
